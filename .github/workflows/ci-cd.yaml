@@ -46,11 +46,24 @@ jobs:
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
-          cd flask-app || mkdir flask-app && cd flask-app
-          git clone https://github.com/${{ github.repository }} . || git pull
-          pip3 install -r requirements.txt
-          pkill -f app.py || true
-          nohup python3 app.py > output.log 2>&1 &
+          set -e
+
+          if [ ! -d "flask-app" ]; then
+            git clone https://github.com/bharathrm555/github_actions_hvrd flask-app
+          fi
+
+          cd flask-app
+          git fetch origin
+          git reset --hard origin/staging
+
+          if [ ! -d "venv" ]; then
+            python3 -m venv venv
+          fi
+
+          source venv/bin/activate
+          pip install -r requirements.txt
+
+          sudo systemctl restart flask-app
 
   deploy-production:
     needs: build-test
@@ -68,8 +81,21 @@ jobs:
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
-          cd flask-app || mkdir flask-app && cd flask-app
-          git clone https://github.com/${{ github.repository }} . || git pull
-          pip3 install -r requirements.txt
-          pkill -f app.py || true
-          nohup python3 app.py > output.log 2>&1 &
+          set -e
+
+          if [ ! -d "flask-app" ]; then
+            git clone https://github.com/bharathrm555/github_actions_hvrd flask-app
+          fi
+
+          cd flask-app
+          git fetch origin
+          git reset --hard origin/main
+
+          if [ ! -d "venv" ]; then
+            python3 -m venv venv
+          fi
+
+          source venv/bin/activate
+          pip install -r requirements.txt
+
+          sudo systemctl restart flask-app
