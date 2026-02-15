@@ -1,0 +1,75 @@
+name: Flask CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+  release:
+    types: [created]
+
+jobs:
+
+  build-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install Dependencies
+      run: |
+        pip install -r requirements.txt
+
+    - name: Run Tests
+      run: |
+        pytest
+
+  deploy-staging:
+    needs: build-test
+    if: github.ref == 'refs/heads/staging'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Deploy to Staging
+      uses: appleboy/ssh-action@v0.1.6
+      with:
+        host: ${{ secrets.STAGING_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          cd flask-app || mkdir flask-app && cd flask-app
+          git clone https://github.com/${{ github.repository }} . || git pull
+          pip3 install -r requirements.txt
+          pkill -f app.py || true
+          nohup python3 app.py > output.log 2>&1 &
+
+  deploy-production:
+    needs: build-test
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Deploy to Production
+      uses: appleboy/ssh-action@v0.1.6
+      with:
+        host: ${{ secrets.PRODUCTION_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          cd flask-app || mkdir flask-app && cd flask-app
+          git clone https://github.com/${{ github.repository }} . || git pull
+          pip3 install -r requirements.txt
+          pkill -f app.py || true
+          nohup python3 app.py > output.log 2>&1 &
